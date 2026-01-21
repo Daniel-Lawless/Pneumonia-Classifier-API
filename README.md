@@ -160,15 +160,6 @@ On warm invocations:
 
 ---
 
-## Possible Extensions
-
-- Automate model extraction from `model.tar.gz` via CI/CD
-- Add monitoring and latency metrics
-- Enable batch inference
-- Versioned model artifacts
-
----
-
 ## Quickstart
 
 This project has two parts:
@@ -295,3 +286,13 @@ Next Steps:
 Upload a chest X-ray image to the /predict endpoint to receive:
 - Predicted class (PNEUMONIA or NORMAL)
 - Confidence score
+
+---
+
+## Improvements to be made:
+
+- Automate model extraction from `model.tar.gz` via CI/CD
+- Add monitoring and latency metrics
+- Enable batch inference
+- Versioned model artifacts
+- - Parameterize training configuration in `train_sagemaker.py` (remove hard-coded paths and resource values)
