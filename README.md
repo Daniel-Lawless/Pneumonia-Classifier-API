@@ -1,0 +1,163 @@
+# Pneumonia Classifier API
+
+End-to-end deep learning system for pneumonia detection using PyTorch, Amazon SageMaker, and serverless inference on AWS.
+
+## Overview
+
+This project implements a production-style, end-to-end machine learning pipeline for medical image classification.
+
+It covers:
+- GPU-accelerated model training on Amazon SageMaker
+- Serverless inference using AWS Lambda, FastAPI, and container images
+- Artifact persistence and promotion via Amazon S3
+- - Best-checkpoint selection based on validation accuracy and loss
+- Explicit train / validation / test dataset separation
+
+## System Architecture
+
+<p 
+   align="center">
+    <td align="center">
+      <img src="docs/architecture.jpg" width="700"><br>
+      <em>Architecture diagram generated with AI assistance (Gemini Banana Pro) based on my system design.</em>
+    </td>
+</p>
+
+**High-level flow:**
+
+S3 (dataset) → SageMaker (training) → S3 (model artifacts) → Lambda (serverless inference)
+
+## API Interface
+
+**Endpoint:** `POST /predict`
+
+- Accepts image uploads (`multipart/form-data`)
+- Returns:
+  - Predicted class: `PNEUMONIA` or `NORMAL`
+  - Confidence score
+
+FastAPI is adapted to AWS Lambda using Mangum.
+
+The function is exposed via a Lambda Function URL, enabling direct HTTPS access without API Gateway.
+
+### Swagger UI – Image Upload
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="docs/api/swagger_pneumonia_prediction_1.png" width="350"><br>
+      <em>Pneumonia prediction</em>
+    </td>
+    <td align="center">
+      <img src="docs/api/swagger_normal_prediction_1.png" width="350"><br>
+      <em>Normal prediction</em>
+    <td align="center">
+      <img src="docs/api/swagger_pneumonia_prediction_2.png" width="350"><br>
+      <em>Pneumonia prediction</em>
+    <td align="center">
+      <img src="docs/api/swagger_normal_prediction_2.png" width="350"><br>
+      <em>Normal prediction</em>
+    </td>
+  </tr>
+</table>
+
+
+## Data Layer (Amazon S3)
+
+All data is stored in Amazon S3 and passed into SageMaker as separate input channels.
+
+**Dataset structure:**
+
+- `s3://<bucket>/chest_xray/train/` — training images  
+- `s3://<bucket>/chest_xray/val/` — validation images  
+- `s3://<bucket>/chest_xray/test/` — held-out test images  
+
+These are mounted inside the training container by SageMaker as:
+
+- `/opt/ml/input/data/train`
+- `/opt/ml/input/data/val`
+- `/opt/ml/input/data/test`
+
+
+## Model Training (Amazon SageMaker)
+
+Training is performed using a SageMaker PyTorch training job.
+
+**Configuration:**
+- Framework: PyTorch
+- Model: ResNet-18 (ImageNet pretrained)
+- Instance type: GPU-enabled (e.g. `ml.g4dn.xlarge`)
+- Entry script: `train_model.py`
+
+### Training Logic
+
+- Images are resized and normalized to match ResNet-18 expectations
+- I changed the output layer of Resnet to output 2 classes instead of 1000 classes.
+- Training runs for a fixed number of epochs
+- After each epoch:
+  - Training loss is computed
+  - Validation accuracy is computed
+  - Validation loss is computed
+
+### Best-Checkpoint Selection
+
+The model is saved when:
+- Validation accuracy is strictly higher than the current best, or
+- Validation accuracy is equal and validation loss is lower
+
+Best weights are saved to: /opt/ml/model/pneumonia_classifier.pth
+
+### Final Evaluation
+
+After training:
+- The best weights are reloaded and input into our model
+- The model is then ran on the test set
+- Test accuracy and loss are logged
+
+SageMaker automatically packages `/opt/ml/model/` into `model.tar.gz` and uploads it to S3.
+
+## Artifact Management
+
+The trained model artifact (`model.tar.gz`) produced by SageMaker is decoupled from inference infrastructure.
+
+- The weights `pneumonia_classifier.pth` are manually extracted from `model.tar.gz` and uploaded to s3://pneumonia-model-weights-eu-north-1/pneumonia_classifier.pth
+  
+## Serverless Inference (AWS Lambda)
+
+Inference is implemented using AWS Lambda running a container image.
+
+### Inference Container
+
+The Docker image includes:
+- FastAPI application
+- PyTorch (CPU-only)
+- Torchvision and Pillow for image preprocessing
+- Inference logic
+
+The image is built locally and pushed to Amazon ECR.
+
+AWS Lambda is configured to run directly from the ECR image.
+
+### Cold Start Behaviour
+
+On cold start:
+- The model weights are downloaded from S3
+- The model is loaded into memory "/tmp/model.pth" (The writable portion of Lambdas file system.)
+
+On warm invocations:
+- The loaded model is reused to minimize latency
+
+## Design Highlights
+
+- Clear separation of training and inference lifecycles
+- GPU acceleration used only where necessary
+- Explicit validation-driven checkpoint selection
+- Serverless inference with automatic scaling
+- Minimal cold-start overhead via model caching
+- Infrastructure aligned with production ML patterns
+
+## Possible Extensions
+
+- Automate model extraction from `model.tar.gz` via CI/CD
+- Add monitoring and latency metrics
+- Enable batch inference
+- Versioned model artifacts
