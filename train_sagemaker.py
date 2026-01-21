@@ -42,15 +42,17 @@ trainer = ModelTrainer( # Defines and launches a SageMaker training job.
 # InputData specifies where the data lives.  In this case our data is already stored in S3. Each InputData object
 # Creates a channel. Channels can be thought of as named folders. channel_name="train" creates a channel called train.
 # SageMaker then mounts this at /opt/ml/input/data/train. Similarly, channel_name="val" -> /opt/ml/input/data/val
-# data_source=s3://,,,/train says download everything from this path and place it into the train channel.
+# and for test. data_source=s3://,,,/train says download everything from this path and place it into the train channel.
+# this is where SM_CHANNEL_TRAIN in train_model.py becomes /opt/ml/input/data/train
 train_data = InputData(channel_name="train", data_source="s3://pneumonia-model-weights-eu-north-1/chest_xray/train")
 val_data   = InputData(channel_name="val",   data_source="s3://pneumonia-model-weights-eu-north-1/chest_xray/val")
+test_data = InputData(channel_name="test", data_source="s3://pneumonia-model-weights-eu-north-1/chest_xray/test")
 
 # This returns a reference to the training job.
 training_job = trainer.train( # Submits a SageMaker training job to AWS
-    # Tells SageMaker create two input channels for this job. Specifically /opt/ml/input/data/train and /opt/ml/input/data/val
-    # These are the folders train_model.py reads from
-    input_data_config=[train_data, val_data],
+    # Tells SageMaker create three input channels for this job. Specifically /opt/ml/input/data/train, /opt/ml/input/data/val,
+    # and /opt/ml/input/data/val. These are the folders train_model.py reads from
+    input_data_config=[train_data, val_data, test_data] ,
     wait=False, # Python call doesn't hang until training finishes. The training job runs in the background.
     # Note, we can watch training using CloudWatch in AWS. CloudWatch -> Log Management -> Log Groups we will see our
     # training job.
