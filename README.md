@@ -295,4 +295,4 @@ Upload a chest X-ray image to the /predict endpoint to receive:
 - Add monitoring and latency metrics
 - Enable batch inference
 - Versioned model artifacts
-- - Parameterize training configuration in `train_sagemaker.py` (remove hard-coded paths and resource values)
+- Parameterize training configuration in `train_sagemaker.py` (remove hard-coded paths and resource values)
