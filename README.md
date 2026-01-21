@@ -10,7 +10,7 @@ It covers:
 - GPU-accelerated model training on Amazon SageMaker
 - Serverless inference using AWS Lambda, FastAPI, and container images
 - Artifact persistence and promotion via Amazon S3
-- - Best-checkpoint selection based on validation accuracy and loss
+- Best-checkpoint selection based on validation accuracy and loss
 - Explicit train / validation / test dataset separation
 
 ## System Architecture
