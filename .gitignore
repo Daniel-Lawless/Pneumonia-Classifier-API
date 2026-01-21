@@ -8,3 +8,6 @@ __pychache__/
 
 # Data
 chest_xray/
+
+# model weights
+*.pth
