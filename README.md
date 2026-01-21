@@ -43,8 +43,8 @@ The function is exposed via a Lambda Function URL, enabling direct HTTPS access 
 ### Swagger UI – Image Upload
 
 <div align="center">
-  <img src="docs/api/swagger_normal_prediction_1.png" width="450" alt="Normal prediction" style="margin: 0 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
-  <img src="docs/api/swagger_pneumonia_prediction_1.png" width="450" alt="Pneumonia prediction" style="margin: 0 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
+  <img src="docs/api/swagger_normal_prediction_1.png" width="400" alt="Normal prediction" style="margin: 0 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
+  <img src="docs/api/swagger_pneumonia_prediction_1.png" width="400" alt="Pneumonia prediction" style="margin: 0 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
   <br><br>
   <em><strong>Fig 2:</strong> Side-by-side comparison of FastAPI <code>/predict</code> results for Normal vs. Pneumonia chest X-rays.</em>
 </div>
