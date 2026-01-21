@@ -53,12 +53,13 @@ class PneumoniaDateset(Dataset):
 
         return image, label  # return a tuple of the image and label
 
-def evaluate(model, loader, device):
+def evaluate(model, loader, device, criterion):
     # Switch to eval mode. This changes model behaviour. For example, turn off dropout, or use variance
     # and mean calculated from training for batch norm.
     model.eval()
     correct = 0 # Total predictions correct
     total = 0 # Total predictions
+    running_loss = 0.0
 
     with torch.no_grad():
         for images, labels in loader:
@@ -66,11 +67,13 @@ def evaluate(model, loader, device):
             labels = labels.to(device, non_blocking=True) # Labels must be on device, shape (batch_size,)
 
             logits = model(images) # Get outputs shape (batch_size, class_labels)
+            loss = criterion(logits, labels)
 
             # For each image, find the class with the largest logit value.
             # Returns (value, class_index); class_index corresponds to the prediction, so we keep it.
             # preds is a Tensor with shape (batch_size,) of our predictions.
             _, preds = torch.max(logits, 1)
+            running_loss += loss.item()
 
             # This is equivalent to scikit-learns accuracy_score. Doing this by hand in Pytorch allows us to not switch
             # back to the CPU, since to use sk-learn we would have to convert to a numpy array, and these cannot
@@ -87,7 +90,10 @@ def evaluate(model, loader, device):
             # first dimension. In this case, labels has shape (batch_size,) so the first dimension is batch_size.
             total += labels.size(0)
 
-        return correct / total
+    accuracy = correct/total
+    avg_loss = running_loss / len(loader)
+
+    return accuracy, avg_loss
 
 
 def train(args):
@@ -113,6 +119,7 @@ def train(args):
     # Initialize Dataset objects for train, and val (image paths and labels only) and stores the transform.
     train_dataset = PneumoniaDateset(args.train_dir, transform=transform)
     val_dataset = PneumoniaDateset(args.val_dir, transform=transform)
+    test_dataset = PneumoniaDateset(args.test_dir, transform=transform)
 
     # Loads data into the model in batches. Shuffle is on for training, since we do not want to learn ordering patterns.
     # Shuffle is off for validation keep it deterministic, repeatable, and stable for metrics. Each
@@ -133,6 +140,8 @@ def train(args):
                               num_workers=args.num_workers, pin_memory=(device.type == "cuda"))
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,
                               num_workers=args.num_workers, pin_memory=(device.type == "cuda"))
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False,
+                              num_workers=args.num_workers, pin_memory=(device.type == "cuda"))
 
     # Create a ResNet-18 model that has been pretrained on ImageNet. So instead of starting with a model with random weights
     # we start with a model that can already detect edges, textures, shapes and has learned from ~ 1.2 million images.
@@ -152,8 +161,9 @@ def train(args):
     # Optimize weights using Adam. model.parameters() passes all trainable parameters to the optimizer.
     optimizer = optim.Adam(lr=args.lr, params=model.parameters())
 
-    # Initialise val accuracy.
-    best_val_accuracy = 0.0
+    # Initialise val accuracy and val_loss.
+    best_val_acc = 0.0
+    best_val_loss = float("inf") # defined to be bigger than any other value
 
     # Creates the path that SageMaker will save the final weights to i.e., /opt/ml/model/pneumonia_classifier.pth
     path = os.path.join(args.model_dir, "pneumonia_classifier.pth")
@@ -164,7 +174,7 @@ def train(args):
 
     for epoch in range(args.epochs): # Number of times we run through the whole training set.
         model.train() # Set model to training
-        running_loss = 0.0  # Reset at the beginning of each epoch
+        running_loss_train = 0.0  # Reset at the beginning of each epoch
 
         for images, labels in train_loader:  # We go through the whole train_dataset one batch at a time.
             images = images.to(device, non_blocking=True)  # Images must be sent to the device.
@@ -175,27 +185,45 @@ def train(args):
             # [logit for Normal, logit for Pneu]
             logits = model(images)
 
-            loss = criterion(logits, labels) # Calculate the loss
-            loss.backward() # Back propagation
+            train_loss = criterion(logits, labels) # Calculate the loss
+            train_loss.backward() # Back propagation
 
             optimizer.step() # Using the calculated gradients from back prop, update the weights using Adam.
-            running_loss += loss.item()  # add the loss for each batch to the overall running loss for current epoch.
+            running_loss_train += train_loss.item()  # add the loss for each batch to the overall running loss for current epoch.
 
-        val_acc = evaluate(model, val_loader, device) # Calculate the validation accuracy after each epoch.
+        # Calculate the validation accuracy and loss after each epoch.
+        val_acc, val_loss = evaluate(model, val_loader, device, criterion)
         # Running loss is calculated over all batches, so we get the average loss by dividing by the number of batches.
-        loss = running_loss / len(train_loader)
-        print(f"Epoch {epoch + 1}: val_acc={val_acc:.4f}, loss={loss:.4f}")
+        train_loss = running_loss_train / len(train_loader)
+        print(f"Epoch {epoch + 1}: "
+              f"val_acc={val_acc:.4f},"
+              f" val_loss= {val_loss:.4f},"
+              f" train_loss={train_loss:.4f}")
 
+        # We use epsilon here to avoid equality checks with floats, i.e., val_acc = best_val_accuracy. We instead
+        # check if their difference is lower than some very small number. This avoids floating point precision errors.
+        epsilon = 1e-12
         # This will save the model weights that perform the best on the validation set. If two epochs have the same
-        # val_accuracy, it will take the most recent one.
-        if val_acc >= best_val_accuracy:
-            best_val_accuracy = val_acc
+        # val_acc, it will save the model weights of the one with the lower val _oss.
+        if val_acc > best_val_acc or (abs(val_acc - best_val_acc) <= epsilon and val_loss < best_val_loss):
+            best_val_acc = val_acc
+            best_val_loss = val_loss
             torch.save(model.state_dict(), path)
 
             # Save the learned parameters of the model to disk. model.state_dict() is a dictionary mapping layer_name ->
             # parameter_tensor. i.e., {"conv1.weight": tensor(...), "bn1.weight": tensor(...), ..., "fc.weight": tensor(...),
             # "fc.bias": tensor(...)}. This represents the models learned state. Saving only the weights, not the whole model
-            # increases portability,
+            # increases portability.
+
+    # Reports back the best validation accuracy and the path we're going to load the best weights from.
+    print(f"Best val_acc={best_val_acc:.4f}. Loading best weights from: {path}")
+    # Load the optimised weights into our resnet18 model.
+    model.load_state_dict(torch.load(path, map_location=device))
+    # Run this model on our test data.
+    test_acc, test_loss = evaluate(model, test_loader, device, criterion)
+    # print the test accuracy.
+    print(f"Final test_acc = {test_acc:.4f} ",
+          f"Final test_loss = {test_loss:.4f}")
 
 # if __name__ = "__main__" means this will only run when this file is executed directly. i.e., python train_model.py.
 # This prevents accidental execution.
@@ -232,6 +260,8 @@ if __name__ == "__main__":
                         default=os.environ.get("SM_CHANNEL_TRAIN", "./chest_xray/train"))
     parser.add_argument("--val-dir", type=str,
                         default=os.environ.get("SM_CHANNEL_VAL", "./chest_xray/val"))
+    parser.add_argument("--test-dir", type=str,
+                        default=os.environ.get("SM_CHANNEL_TEST", "./chest_xray/test"))
 
     # This reads the flags, validates them, applies defaults, and packages everything into an object called args.
     # After this line runs args contains all our hyperparameters and paths. Where these arguments come from depends on
