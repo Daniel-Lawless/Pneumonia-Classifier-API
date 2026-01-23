@@ -21,7 +21,7 @@ app = FastAPI(title="Pneumonia Classifier API")
 # os.environ.get(key, default) Says get the value at this key if it exists, otherwise use the default value.
 S3_BUCKET = os.environ.get("S3_BUCKET", "pneumonia-model-weights-eu-north-1")
 MODEL_KEY = os.environ.get("MODEL_KEY", "pneumonia_classifier.pth")
-LOCAL_MODEL_PATH = "/tmp/model.pth"
+LOCAL_MODEL_PATH = os.path.join("tmp", "model.pth")
 # Path inside the lambda container where our model will live after it
 # is downloaded from S3. In AWS Lambda, you cannot write to most of the
 # file system. However, we can write to /tmp, it persists for the lifetime of the

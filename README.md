@@ -213,8 +213,8 @@ cp pneumonia_classifier.pth ./tmp/model.pth
 
 Windows (native Python):
 ```powershell
-mkdir C:\tmp
-copy .\pneumonia_classifier.pth C:\tmp\model.pth
+mkdir tmp
+copy .\pneumonia_classifier.pth tmp\model.pth
 ```
 
 ### Run the API
@@ -297,7 +297,7 @@ Next Steps:
 
 - Create an AWS Lambda function using the ECR image
 
-- Configure a Lambda Function URL or API Gateway
+- Configure a Lambda Function URL
 
 Upload a chest X-ray image to the /predict endpoint to receive:
 - Predicted class (PNEUMONIA or NORMAL)
