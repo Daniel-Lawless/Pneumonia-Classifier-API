@@ -179,7 +179,7 @@ This project has two parts:
 
 ### Setup
 ```bash
-git clone https://github.com/Daniel-Lawless/Pneumonia-Classifier-API.git
+git clone https://github.com/Daniel-Lawless/Pneumonia-Classifier-End-To-End.git
 cd Pneumonia-Classifier-API
 
 python -m venv venv
