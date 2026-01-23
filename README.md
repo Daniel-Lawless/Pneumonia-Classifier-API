@@ -1,4 +1,4 @@
-# Pneumonia Classifier API
+# End-to-End Pneumonia Classification System (SageMaker + Serverless Inference)
 End-to-end deep learning system for pneumonia detection using PyTorch, Amazon SageMaker, and serverless inference on AWS.
 
 > **⚠️ Disclaimer:** This project is not intended to provide medical advice.
