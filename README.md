@@ -180,7 +180,7 @@ This project has two parts:
 ### Setup
 ```bash
 git clone https://github.com/Daniel-Lawless/Pneumonia-Classifier-End-To-End.git
-cd Pneumonia-Classifier-API
+cd Pneumonia-Classifier-End-To-End
 
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
