@@ -142,8 +142,9 @@ AWS Lambda is configured to run directly from the ECR image.
 ### Cold Start Behaviour
 
 On cold start:
-- The model weights are downloaded from S3
-- The model is loaded into memory "/tmp/model.pth" (The writable portion of Lambdas file system.)
+1. Model weights are downloaded from Amazon S3.
+2. The weights are written to /tmp (the writable portion of the AWS Lambda filesystem).
+3. The model is loaded into memory from the /tmp file for inference.
 
 On warm invocations:
 - The loaded model is reused to minimize latency
